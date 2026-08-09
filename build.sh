@@ -13,6 +13,7 @@ else
 fi
 
 BASE_PATH=$(cd "$WRT_CORE_PATH" && pwd)
+source "$BASE_PATH/modules/banner.sh"
 
 REPO_ROOT=$(cd "$BASE_PATH/.." && pwd)
 
@@ -432,6 +433,7 @@ fi
 
 "$BASE_PATH/update.sh" "$REPO_URL" "$REPO_BRANCH" "$BUILD_DIR" "$COMMIT_HASH"
 
+install_custom_banner "$BASE_PATH/deconfig/banner" "$BASE_PATH/../$BUILD_DIR"
 apply_config
 print_config_fragment_summary
 remove_uhttpd_dependency
