@@ -238,25 +238,55 @@ add_quickfile() {
 }
 
 
-update_argon() {
-    local repo_url="https://github.com/ZqinKing/luci-theme-argon.git"
-    local dst_theme_path="$BUILD_DIR/feeds/luci/themes/luci-theme-argon"
+replace_luci_source() {
+    local source_name=$1
+    local repo_url=$2
+    local destination=$3
     local tmp_dir
     tmp_dir=$(mktemp -d)
 
-    echo "正在更新 argon 主题..."
+    echo "正在更新 ${source_name}..."
 
     if ! git_retry clone --depth 1 "$repo_url" "$tmp_dir"; then
-        echo "错误：从 $repo_url 克隆 argon 主题仓库失败" >&2
+        echo "错误：从 $repo_url 克隆 ${source_name} 仓库失败" >&2
         rm -rf "$tmp_dir"
-        exit 1
+        return 1
     fi
 
-    rm -rf "$dst_theme_path"
+    rm -rf "$destination"
     rm -rf "$tmp_dir/.git"
-    mv "$tmp_dir" "$dst_theme_path"
+    mkdir -p "$(dirname "$destination")"
+    mv "$tmp_dir" "$destination"
 
-    echo "luci-theme-argon 更新完成"
+    echo "${source_name} 更新完成"
+}
+
+
+update_argon() {
+    replace_luci_source "argon theme" \
+        "https://github.com/jerrykuku/luci-theme-argon.git" \
+        "$BUILD_DIR/feeds/luci/themes/luci-theme-argon"
+}
+
+
+update_argon_config() {
+    replace_luci_source "argon config" \
+        "https://github.com/jerrykuku/luci-app-argon-config.git" \
+        "$BUILD_DIR/feeds/luci/applications/luci-app-argon-config"
+}
+
+
+update_aurora() {
+    replace_luci_source "aurora theme" \
+        "https://github.com/eamonxg/luci-theme-aurora.git" \
+        "$BUILD_DIR/feeds/luci/themes/luci-theme-aurora"
+}
+
+
+update_aurora_config() {
+    replace_luci_source "aurora config" \
+        "https://github.com/eamonxg/luci-app-aurora-config.git" \
+        "$BUILD_DIR/feeds/luci/applications/luci-app-aurora-config"
 }
 
 
