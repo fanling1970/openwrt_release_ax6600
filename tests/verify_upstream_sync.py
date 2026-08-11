@@ -115,6 +115,14 @@ require(
     "build.sh",
     'install_custom_banner "$BASE_PATH/deconfig/banner" "$BASE_PATH/../$BUILD_DIR"',
 )
+require(
+    "build.sh",
+    '"$BASE_PATH/update.sh" "$REPO_URL" "$REPO_BRANCH" "$BUILD_DIR" "$COMMIT_HASH" "$DOCKER_STACK_SELECTED"',
+)
+require(
+    "wrt_core/update.sh",
+    'docker_stack_sync_nftables_compat_if_selected "$DOCKER_STACK_SELECTED" "$BUILD_DIR" "0"',
+)
 require("wrt_core/modules/target_fixes.sh", "991_custom_settings")
 
 for workflow_path in [
@@ -138,5 +146,35 @@ assert "workflow_call:" in release
 batch = read(".github/workflows/release_wrt_all.yml")
 assert "uses: ./.github/workflows/release_wrt.yml" in batch
 assert "matrix.model" in batch
+
+VIKINGYFY_REPO_URL = "https://github.com/VIKINGYFY/immortalwrt.git"
+VIKINGYFY_PIN = "3fd1e27a511851b41cf082b067b60099e8e026c4"
+vikingyfy_ipq60xx = {
+    "jdcloud_ipq60xx_immwrt",
+    "link_nn6000v2_immwrt",
+    "qihoo_360v6_immwrt",
+    "redmi_ax5_immwrt",
+    "zn_m2_immwrt",
+}
+vikingyfy_pins = {}
+for config in (ROOT / "wrt_core/compilecfg").glob("*.ini"):
+    settings = {}
+    for line in config.read_text(encoding="utf-8").splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            settings[key] = value
+    if (
+        settings.get("REPO_URL") == VIKINGYFY_REPO_URL
+        and settings.get("REPO_BRANCH") == "main"
+        and "COMMIT_HASH" in settings
+    ):
+        vikingyfy_pins[config.stem] = settings["COMMIT_HASH"]
+
+assert set(vikingyfy_pins) == vikingyfy_ipq60xx, (
+    f"unexpected VIKINGYFY/main pinned devices: {sorted(vikingyfy_pins)}"
+)
+assert all(value == VIKINGYFY_PIN for value in vikingyfy_pins.values()), (
+    f"unexpected VIKINGYFY/main pin values: {vikingyfy_pins}"
+)
 
 print("upstream synchronization invariants: PASS")

@@ -61,6 +61,12 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 
 编译完成后，脚本会从 `<BUILD_DIR>/bin/targets/` 收集固件文件到仓库根目录的 `firmware/`。每次完整构建前会清理旧的目标固件文件，`firmware/Packages.manifest` 会被移除。
 
+## 验证
+
+```bash
+bash tests/run_all.sh
+```
+
 ## 5. 支持设备
 
 设备配置名来自 `wrt_core/compilecfg/` 和 `wrt_core/deconfig/` 中同名文件。当前支持：

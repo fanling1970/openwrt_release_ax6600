@@ -14,6 +14,7 @@ fi
 
 BASE_PATH=$(cd "$WRT_CORE_PATH" && pwd)
 source "$BASE_PATH/modules/banner.sh"
+source "$BASE_PATH/modules/docker.sh"
 
 REPO_ROOT=$(cd "$BASE_PATH/.." && pwd)
 
@@ -206,6 +207,8 @@ DEFAULT_CONFIG_FRAGMENTS=()
 ADD_CONFIG_FRAGMENT_LIST=()
 REMOVE_CONFIG_FRAGMENT_LIST=()
 EFFECTIVE_CONFIG_FRAGMENTS=()
+DOCKER_STACK_CONFIG_INPUTS=()
+DOCKER_STACK_SELECTED=""
 
 parse_fragment_csv() {
     local csv=$1
@@ -297,9 +300,39 @@ resolve_config_fragments() {
     done
 }
 
+resolve_docker_stack_selection() {
+    local fragment
+    local status=0
+
+    DOCKER_STACK_CONFIG_INPUTS=(
+        "$CONFIG_FILE"
+        "$BASE_PATH/deconfig/compile_base.config"
+    )
+
+    for fragment in "${EFFECTIVE_CONFIG_FRAGMENTS[@]}"; do
+        DOCKER_STACK_CONFIG_INPUTS+=("$CONFIG_FRAGMENT_DIR/$fragment.config")
+    done
+
+    if docker_stack_selected_in_configs "${DOCKER_STACK_CONFIG_INPUTS[@]}"; then
+        DOCKER_STACK_SELECTED=1
+        return 0
+    else
+        status=$?
+    fi
+
+    if [[ $status -eq 1 ]]; then
+        DOCKER_STACK_SELECTED=0
+        return 0
+    fi
+
+    echo "Error: failed to determine Docker stack selection." >&2
+    return "$status"
+}
+
 print_config_fragment_summary() {
     echo "Config fragments:"
     echo "  Device: $Dev"
+    echo "  Source commit: $COMMIT_HASH"
     echo "  Default fragments: $(join_fragments "${DEFAULT_CONFIG_FRAGMENTS[@]}")"
     echo "  Add fragments: $(join_fragments "${ADD_CONFIG_FRAGMENT_LIST[@]}")"
     echo "  Remove fragments: $(join_fragments "${REMOVE_CONFIG_FRAGMENT_LIST[@]}")"
@@ -318,6 +351,8 @@ print_config_preview() {
         echo "  $order) $CONFIG_FRAGMENT_DIR/$fragment.config"
         order=$((order + 1))
     done
+
+    echo "Docker stack selected: $DOCKER_STACK_SELECTED"
 
 }
 
@@ -419,7 +454,22 @@ BUILD_DIR=$(read_ini_by_key "BUILD_DIR")
 COMMIT_HASH=$(read_ini_by_key "COMMIT_HASH")
 COMMIT_HASH=${COMMIT_HASH:-none}
 
+if [[ -n ${PRECLONE_COMMIT_HASH:-} ]]; then
+    if [[ ! $PRECLONE_COMMIT_HASH =~ ^[0-9a-fA-F]{40}$ ]]; then
+        echo "Error: PRECLONE_COMMIT_HASH must be a 40-character hexadecimal SHA." >&2
+        exit 1
+    fi
+
+    if [[ $COMMIT_HASH == "none" ]]; then
+        COMMIT_HASH=$PRECLONE_COMMIT_HASH
+    elif [[ $COMMIT_HASH != "$PRECLONE_COMMIT_HASH" ]]; then
+        echo "Error: configured COMMIT_HASH does not match PRECLONE_COMMIT_HASH." >&2
+        exit 1
+    fi
+fi
+
 resolve_config_fragments
+resolve_docker_stack_selection
 
 if [[ $Build_Mod == "config_preview" ]]; then
     print_config_preview
@@ -431,7 +481,7 @@ if [[ -d action_build ]]; then
     BUILD_DIR="action_build"
 fi
 
-"$BASE_PATH/update.sh" "$REPO_URL" "$REPO_BRANCH" "$BUILD_DIR" "$COMMIT_HASH"
+"$BASE_PATH/update.sh" "$REPO_URL" "$REPO_BRANCH" "$BUILD_DIR" "$COMMIT_HASH" "$DOCKER_STACK_SELECTED"
 
 install_custom_banner "$BASE_PATH/deconfig/banner" "$BASE_PATH/../$BUILD_DIR"
 apply_config

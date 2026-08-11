@@ -1,24 +1,8 @@
 #!/usr/bin/env bash
 
-set -e
-set -o errexit
-set -o errtrace
-
 error_handler() {
     echo "Error occurred in script at line: ${BASH_LINENO[0]}, command: '${BASH_COMMAND}'"
 }
-
-trap 'error_handler' ERR
-
-REPO_URL=$1
-REPO_BRANCH=$2
-BUILD_DIR=$3
-COMMIT_HASH=$4
-
-# 转换为绝对路径，避免后续 cd 后路径失效。
-if [[ "$BUILD_DIR" != /* ]]; then
-    BUILD_DIR="$(pwd)/$BUILD_DIR"
-fi
 
 FEEDS_CONF="feeds.conf.default"
 GOLANG_REPO="https://github.com/sbwml/packages_lang_golang"
@@ -26,7 +10,7 @@ GOLANG_BRANCH="26.x"
 THEME_SET="argon"
 LAN_ADDR="10.0.0.1"
 
-SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 BASE_PATH=${BASE_PATH:-$SCRIPT_DIR}
 
 # 按静态职责加载模块，执行顺序仍由本脚本统一控制。
@@ -126,7 +110,7 @@ stage_feeds_install() {
 stage_post_install_package_fixes() {
     # 这里处理已安装到 package/feeds/* 的包和最终一致性检查。
     verify_custom_feed_installed_paths
-    docker_stack_sync_nftables_compat "$BUILD_DIR" "0"
+    docker_stack_sync_nftables_compat_if_selected "$DOCKER_STACK_SELECTED" "$BUILD_DIR" "0"
     fix_easytier_lua
     update_adguardhome
     update_script_priority
@@ -140,7 +124,30 @@ stage_post_install_package_fixes() {
     # apply_hash_fixes
 }
 
+initialize_update_arguments() {
+    REPO_URL=${1:-}
+    REPO_BRANCH=${2:-}
+    BUILD_DIR=${3:-}
+    COMMIT_HASH=${4:-}
+    DOCKER_STACK_SELECTED=${5:-}
+
+    case "$DOCKER_STACK_SELECTED" in
+        0|1) ;;
+        *)
+            echo "Error: Docker stack selection fifth parameter must be 0 or 1." >&2
+            return 2
+            ;;
+    esac
+
+    # 转换为绝对路径，避免后续 cd 后路径失效。
+    if [[ "$BUILD_DIR" != /* ]]; then
+        BUILD_DIR="$(pwd)/$BUILD_DIR"
+    fi
+}
+
 main() {
+    initialize_update_arguments "$@"
+    trap 'error_handler' ERR
     stage_repo_checkout
     stage_upstream_feeds_update
     stage_feed_source_cleanup
@@ -150,4 +157,7 @@ main() {
     stage_post_install_package_fixes
 }
 
-main "$@"
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    set -eE
+    main "$@"
+fi

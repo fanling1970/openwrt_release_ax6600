@@ -1,5 +1,86 @@
 #!/usr/bin/env bash
 
+docker_stack_selected_in_configs() {
+    local config_file=""
+    local selected=""
+
+    if [ "$#" -eq 0 ]; then
+        echo "Error: Docker stack selection requires at least one config file." >&2
+        return 2
+    fi
+
+    for config_file in "$@"; do
+        if [ ! -f "$config_file" ]; then
+            echo "Error: Docker stack selection config not found: $config_file" >&2
+            return 2
+        fi
+    done
+
+    if ! selected=$(awk '
+        /^[[:space:]]*CONFIG_PACKAGE_dockerd=(y|m|n)[[:space:]]*$/ {
+            value = $0
+            sub(/^[^=]*=/, "", value)
+            sub(/[[:space:]]*$/, "", value)
+            dockerd = value
+            next
+        }
+        /^[[:space:]]*CONFIG_PACKAGE_luci-app-dockerman=(y|m|n)[[:space:]]*$/ {
+            value = $0
+            sub(/^[^=]*=/, "", value)
+            sub(/[[:space:]]*$/, "", value)
+            dockerman = value
+            next
+        }
+        /^[[:space:]]*#[[:space:]]*CONFIG_PACKAGE_dockerd[[:space:]]+is[[:space:]]+not[[:space:]]+set[[:space:]]*$/ {
+            dockerd = "n"
+            next
+        }
+        /^[[:space:]]*#[[:space:]]*CONFIG_PACKAGE_luci-app-dockerman[[:space:]]+is[[:space:]]+not[[:space:]]+set[[:space:]]*$/ {
+            dockerman = "n"
+            next
+        }
+        END {
+            if (dockerd == "y" || dockerd == "m" || dockerman == "y" || dockerman == "m") {
+                print "1"
+            } else {
+                print "0"
+            }
+        }
+    ' "$@"); then
+        echo "Error: failed to read Docker stack selection config." >&2
+        return 3
+    fi
+
+    case "$selected" in
+        1) return 0 ;;
+        0) return 1 ;;
+        *)
+            echo "Error: invalid Docker stack selection result: $selected" >&2
+            return 3
+            ;;
+    esac
+}
+
+docker_stack_sync_nftables_compat_if_selected() {
+    local selected="${1:-}"
+
+    case "$selected" in
+        0)
+            echo "Docker stack not selected; skipping nftables compatibility sync."
+            return 0
+            ;;
+        1)
+            shift
+            docker_stack_sync_nftables_compat "$@"
+            return
+            ;;
+        *)
+            echo "Error: Docker stack selection must be 0 or 1, got: ${selected:-missing}" >&2
+            return 2
+            ;;
+    esac
+}
+
 _docker_stack_resolve_component_makefile() {
     local build_dir="$1"
     local component="$2"

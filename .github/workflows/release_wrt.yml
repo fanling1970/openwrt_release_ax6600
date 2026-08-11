@@ -114,10 +114,10 @@ jobs:
           path: |
             ./action_build/.ccache
             ./action_build/staging_dir
-          key: ${{ matrix.os }}-${{ inputs.model }}-${{ hashFiles('**/repo_flag') }}-${{ env.ADD_CONFIG_FRAGMENTS_KEY }}-${{ env.REMOVE_CONFIG_FRAGMENTS_KEY }}-${{ env.BUILD_DATE }}
+          key: ${{ matrix.os }}-${{ inputs.model }}-${{ env.REPO_HASH }}-${{ env.ADD_CONFIG_FRAGMENTS_KEY }}-${{ env.REMOVE_CONFIG_FRAGMENTS_KEY }}-${{ env.BUILD_DATE }}
           restore-keys: |
-            ${{ matrix.os }}-${{ inputs.model }}-${{ hashFiles('**/repo_flag') }}-${{ env.ADD_CONFIG_FRAGMENTS_KEY }}-${{ env.REMOVE_CONFIG_FRAGMENTS_KEY }}-
-            ${{ matrix.os }}-${{ inputs.model }}-${{ hashFiles('**/repo_flag') }}-
+            ${{ matrix.os }}-${{ inputs.model }}-${{ env.REPO_HASH }}-${{ env.ADD_CONFIG_FRAGMENTS_KEY }}-${{ env.REMOVE_CONFIG_FRAGMENTS_KEY }}-
+            ${{ matrix.os }}-${{ inputs.model }}-${{ env.REPO_HASH }}-
 
       - name: Refresh the cache
         run: |
@@ -168,7 +168,7 @@ jobs:
       - name: Delete Old Cache
         run: |
           # 获取缓存列表并删除
-          gh cache list --key ${{ matrix.os }}-${{ inputs.model }}-${{ hashFiles('**/repo_flag') }}- --json key --jq '.[] | .key' | while read -r key; do
+          gh cache list --key ${{ matrix.os }}-${{ inputs.model }}-${{ env.REPO_HASH }}- --json key --jq '.[] | .key' | while read -r key; do
             gh cache delete "$key"
           done
           # 输出缓存状态
@@ -229,11 +229,15 @@ jobs:
           echo "KMOD_ARCHIVE=$archive_name" >> "$GITHUB_ENV"
           echo "Packaged $kmod_count kmod packages into $archive_name"
 
+      - name: Select Packit Rootfs
+        if: ${{ inputs.model == 'n1_immwrt' }}
+        run: bash ./wrt_core/ci/select_packit_rootfs.sh
+
       - name: Package OpenWrt Firmware
         if: ${{ inputs.model == 'n1_immwrt' }}
         uses: unifreq/openwrt_packit@8007d3efd49bb42aa20c5755a50af21dc7a438e1
         env:
-          OPENWRT_ARMVIRT: firmware/*.tar.gz
+          OPENWRT_ARMVIRT: ${{ env.OPENWRT_ARMVIRT }}
           PACKAGE_SOC: s905d
           KERNEL_VERSION_NAME: 6.6.y
           WHOAMI: ZqinKing

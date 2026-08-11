@@ -20,18 +20,17 @@
 #### 修复内容：
 **修改前（❌ 错误）：**
 ```yaml
-key: ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
+key: ${{ matrix.os }}-${{ env.REPO_HASH }}-${{ env.BUILD_DATE }}
 # 缺少设备标识，所有设备共享同一缓存
 ```
 
 **修改后（✅ 正确）：**
 ```yaml
 # release_wrt.yml 和 build_wrt.yml
-key: ${{ matrix.os }}-${{ inputs.model }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
+key: ${{ matrix.os }}-${{ inputs.model }}-${{ env.REPO_HASH }}-${{ env.BUILD_DATE }}
 
-# release_wrt_all.yml
-key: ${{ matrix.os }}-${{ matrix.model }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
-# 包含设备唯一标识，每个设备独立缓存
+# release_wrt_all.yml 只把 matrix.model 传给可复用的 release_wrt.yml。
+# 实际缓存键由被调用的 release_wrt.yml 生成。
 ```
 
 ---
@@ -115,18 +114,17 @@ Model Filter: (留空)
 
 #### 单设备工作流（release_wrt.yml / build_wrt.yml）
 ```yaml
-key: ${{ matrix.os }}-${{ inputs.model }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
+key: ${{ matrix.os }}-${{ inputs.model }}-${{ env.REPO_HASH }}-${{ env.BUILD_DATE }}
 ```
 
 #### 批量构建工作流（release_wrt_all.yml）
-```yaml
-key: ${{ matrix.os }}-${{ matrix.model }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
-```
+`release_wrt_all.yml` 只将 `matrix.model` 传递给可复用的 `release_wrt.yml`；
+缓存键由被调用的工作流生成。
 
 **组成部分**:
 1. `${{ matrix.os }}` - 操作系统标识（ubuntu-24.04）
-2. **`${{ inputs.model }}` 或 `${{ matrix.model }}`** - **设备唯一标识**（关键！）
-3. `${{ hashFiles('**/repo_flag') }}` - 源码版本哈希
+2. **`${{ inputs.model }}`** - **设备唯一标识**（关键！）；批量工作流传入的 `matrix.model` 会成为该输入
+3. `${{ env.REPO_HASH }}` - 由 Pre Clone 根据实际解析到的提交生成的源码版本哈希
 4. `${{ env.BUILD_DATE }}` - 构建时间戳
 
 ### 为什么需要设备标识？
